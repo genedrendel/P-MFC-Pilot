@@ -156,6 +156,24 @@ OBJ_W10_conn_planted <- subset_samples(OBJ_W10_conn, group == "Planted")
 OBJ_W10_conn_FAM <- tax_glom(OBJ_W10_conn,taxrank = "Family")
 OBJ_W10_conn_GEN <- tax_glom(OBJ_W10_conn,taxrank = "Genus")
 
+
+# Table export for agglomerated sheets ------------------------------------
+
+##Agglomerate and then export
+#family (if not already done as per above)
+OBJ_W10_conn_FAM <- tax_glom(OBJ_W10_conn,taxrank = "Family")
+OTU_tab_FAM = as(otu_table(OBJ_W10_conn_FAM), "matrix")
+# transpose if necessary
+#only if transposing:# if(taxa_are_rows(physeq1)){OTU2 <- t(OTU2)}
+# Coerce to data.frame
+OTU_tab_FAMexp = as.data.frame(OTU_tab_FAM)
+write.csv(OTU_tab_FAMexp,"Family_otusheet.csv", row.names = TRUE)
+
+#write corresopnding tax table
+TAX_tab_FAM = as(tax_table(OBJ_W10_conn_FAM), "matrix")
+TAX_tab_FAMexp = as.data.frame(TAX_tab_FAM)
+write.csv(TAX_tab_FAMexp,"Family_taxsheet.csv", row.names = TRUE)
+
 ## nMDS --------------------------------------------------------------------
 
 
@@ -583,7 +601,8 @@ p.simpson
 
 
 
-###################################################### ANCOMBC2 ----------------------------------------------------------------
+
+################################# ANCOMBC2 ----------------------------------------------------------------
 
 BiocManager::install("ANCOMBC")
 
@@ -620,7 +639,7 @@ write.csv(res_global_INO_FAM,"ANCOM-BC2 Global Results_INO_FAM.csv", row.names =
 #Note: This one is the one that should be better, using correct matrix and subestted to only plants
 #differences in inoculum conotrlling for presence of plant (but order factor might not matter??) Adding in tend and trend control node arguments to hopefully get them working
 output_INO_FAM = ancombc2(data = OBJ_W10_conn_planted, tax_level = "Family" , fix_formula = "inoculum", p_adj_method = "holm", prv_cut = 0.1, lib_cut = 0,group = "inoculum", 
-              struc_zero = TRUE, neg_lb = TRUE, alpha = 0.05, global = TRUE, trend = TRUE, trend_control = list(contrast = list(matrix(c(1, 0, -1, 1), nrow = 2, byrow = TRUE)), node = list(2), solver = "ECOS", B = 10))
+              struc_zero = TRUE, neg_lb = TRUE, alpha = 0.05, global = TRUE, trend = TRUE, trend_control = list(contrast = list(matrix(c(1, 0, -1, 1), nrow = 2, byrow = TRUE)), node = list(2), solver = "ECOS", B = 100))
 
 res_trend = output_INO_FAM$res_trend
 res_trend
@@ -676,9 +695,74 @@ write.csv(res_global_INO_FAM,"ANCOM-BC2 Global Results_INO_FAM.csv", row.names =
 
 
 
+######################################## deseq -------------------------------------------------------------------
 
+library(ggplot2)
+library("DESeq2")
+#Start here if haven't already (use raw vaules, but still subset out bad samples)
+OBJ1_exp <- subset_samples(OBJ1, Experiment == "Y")
 
+#Agglomerate at desired taxa level (if you want to, otherwise proceed to and will get individual ASV changes)
 
+OBJ1_exp_Family <- tax_glom(OBJ1_exp,taxrank = "Family")
+
+#And create subset for use later when assigning taxa (NOT for analysis, just to bind taxa to results)
+OBJ_Genus_W14 <- subset_samples(OBJ1_exp_Genus, Week == "Fourteen")
+
+##Import to deseq and order factors to be compared (overall, not agglomerated)
+diagdds = phyloseq_to_deseq2(OBJ1_exp, ~ inoculum) #Re: order of factors here, this would be testing for the effect of location, controlling for connection
+#This time control for location differences, looking for connection response.
+
+##Import agglomerated genus
+diagdds = phyloseq_to_deseq2(OBJ1_exp_Genus, ~ Location + Connection) #Re: order of factors here, this would be testing for the effect of location, controlling for connection
+#import agglomerated family
+diagdds = phyloseq_to_deseq2(OBJ1_exp_Family , ~ Location + Connection) #Re: order of factors here, this would be testing for the effect of location, controlling for connection
+
+diagdds$Location <- relevel(diagdds$Connection, ref = "Unconnected") # sets the reference point, baseline or control to be compared against
+
+#Subset Week 14
+diagdds <- diagdds[ , diagdds$Week == "Fourteen" ]
+#check that subset was done as expected
+as.data.frame( colData(diagdds) )
+
+#Because of the way the data is nested between groups need to do some finangling to allow the model to distinguish between them correctly
+#Have added a new column that groups samples by the soil column they were in (without location data, so e.g W14UP4 for all three cathode/anode/root sampeles)
+
+#Run model and factors
+diagdds = DESeq(diagdds, test = "Wald", fitType = "parametric")
+res = results(diagdds, cooksCutoff = FALSE)
+res # print out results
+
+#Shouldnt need these anymore for agglomerated, but retain for overall
+OBJ1_exp <- subset_samples(OBJ1, Experiment == "Y")
+OBJ_W14 <- subset_samples(OBJ1_exp, Week == "Fourteen")
+
+#Bind taxonomy to results
+res = cbind(as(res, "data.frame"), as(tax_table(OBJ_Genus_W14)[rownames(res), ], "matrix"))
+res
+
+#Export .csv
+write.csv(as.data.frame(res), 
+          file = "DESeq2_Genus_14.csv")
+
+#For Agglomerated
+#Different Comparison Direction Sheets
+sigtabC_U = results(diagdds, contrast = c("Connection","Connected","Unconnected")) #a positive number here should represent an Increase in Connected FROM Unconnected
+sigtabU_C = results(diagdds, contrast = c("Connection","Unconnected","Connected")) #postive here should be switched, so a postive = Increase in Unconnected FROM Connected
+# So i think A should be the one to use...feels more logical to look at change towards connection (and makes discussion of electroactive enrichemnet easier)
+
+#Bind results sheets with OTU Taxa
+sigtab_taxC_U = cbind(as(sigtabC_U, "data.frame"), as(tax_table(OBJ_Genus_W14)[rownames(sigtabC_U), ], "matrix"))
+sigtab_taxC_U
+
+sigtab_taxU_C = cbind(as(sigtabU_C, "data.frame"), as(tax_table(OBJ_Genus_W14)[rownames(sigtabU_C), ], "matrix"))
+sigtab_taxU_C
+
+#Export .csv
+write.csv(as.data.frame(sigtab_taxC_U), 
+          file = "DESeq2_resultsC_U.csv")
+write.csv(as.data.frame(sigtab_taxU_C), 
+          file = "DESeq2_resultsU_C.csv")
 
 
 ###################################### Old paper things below here for reference -------------------------------
