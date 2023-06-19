@@ -48,6 +48,12 @@ library(ggplot2)
 otu_table <- as.data.frame(read.csv("raw_readmap.csv", header = TRUE,row.names = "OTU_ID"))
 taxmat <- as.matrix(read.csv("tax_table.csv", row.names = 1, header = TRUE))
 treat <- as.data.frame(read.csv("mapping_file.csv", row.names = 1, header = TRUE))
+
+#order factors, for reordering in ancom
+
+taxmat <- as.data.frame(read.csv("tax_table.csv", row.names = 1, header = TRUE))
+taxmat$inoculum
+
 TREE <- read.tree("rooted_tree.nwk")
 OTU = otu_table(otu_table, taxa_are_rows = TRUE)
 TAX = tax_table(taxmat)
@@ -619,7 +625,9 @@ library(data.table)
 #INOCULUM
 #Inoculum at FAMILY controlling for location and connection, uninoculated as baseline
 #differences in inoculation treatment controlling for differences in inoculum? (actually in retrospect dont think ordering actually matters in any way...so use this again for baseline non pattern analysis comaprisons from now on)
-output_INO_FAM = ancombc2(data = OBJ_W10_conn, tax_level = "Family" , fix_formula = "group + inoculum", p_adj_method = "holm", prv_cut = 0.1, lib_cut = 0,group = "inoculum", 
+
+
+output_INO_FAM = ancombc2(data = OBJ_W10_conn_planted, tax_level = "Family" , fix_formula = "group + inoculum", p_adj_method = "holm", prv_cut = 0.1, lib_cut = 0,group = "inoculum", 
               struc_zero = TRUE, neg_lb = TRUE, alpha = 0.05, global = TRUE)
 
 res_prim_INO_FAM = output_INO_FAM$res %>%
@@ -634,17 +642,28 @@ res_global_INO_FAM %>%
     data.table(caption = "ANCOM-BC2 Global Results_INO_FAM")
 write.csv(res_global_INO_FAM,"ANCOM-BC2 Global Results_INO_FAM.csv", row.names = TRUE)
 
+#Trend control in ancom section 
+
+#reordering factors (note use Montebelo as the baseline and DO NOT change it for further runs ...ONLY change the matrix used (try increasing and decreasing trends)
+#reason for this is that the example in thr ancombc2 tutorial uses "obese" as it's baseline and we are following that example as closely as possible so as to not upset the matrix structure/baseline pattern etc
+
+factor(sample_data(OBJ_W10_conn_planted)$inoculum) 
+sample_data(OBJ_W10_conn_planted)$inoculum = factor(sample_data(OBJ_W10_conn_planted)$inoculum, levels = c("Montebello", "a_Uninoculated", "Clostridium"))
 
 
-#Note: This one is the one that should be better, using correct matrix and subestted to only plants
-#differences in inoculum conotrlling for presence of plant (but order factor might not matter??) Adding in tend and trend control node arguments to hopefully get them working
+#Trend control / Pattern Analysis Version 1 for decreasing abundance correlated with increased plant growth:
+#Note: This one is the one that should be better, using correct matrix and subestted to only plants,
+#Further note on trend control settings and matrix. Unless otherwise specified trend control baseline follows the same rules as ancomb, tht is, alphabetical. to change the baseline must use the aboce line resetingg the levels so that the order is correctly matchinng the tutorial example\
+#differences in inoculum controlling for presence of plant (but order factor might not matter??) Adding in tend and trend control node arguments to hopefully get them working
+#This version of the trend control results will be looking for DECREASING with plant growth trending taxa.
 output_INO_FAM = ancombc2(data = OBJ_W10_conn_planted, tax_level = "Family" , fix_formula = "inoculum", p_adj_method = "holm", prv_cut = 0.1, lib_cut = 0,group = "inoculum", 
-              struc_zero = TRUE, neg_lb = TRUE, alpha = 0.05, global = TRUE, trend = TRUE, trend_control = list(contrast = list(matrix(c(1, 0, -1, 1), nrow = 2, byrow = TRUE)), node = list(2), solver = "ECOS", B = 100))
+              struc_zero = TRUE, neg_lb = TRUE, alpha = 0.05, global = TRUE, trend = TRUE, trend_control = list(contrast = list(matrix(c(1, 0, -1, 1), nrow = 2, byrow = TRUE)), node = list(2), solver = "ECOS", B = 10))
 
+#Export trend analysis
 res_trend = output_INO_FAM$res_trend
 res_trend
     data.table(caption = "ANCOM-BC2_Trend_Results_FAM")
-write.csv(res_trend,"ANCOM-BC2_Trend_Results_FAM.csv", row.names = TRUE)
+write.csv(res_trend,"ANCOM-BC2_Trend_Results_FAM_decreasingwithgrowth.csv", row.names = TRUE)
 
 res_prim_INO_FAM = output_INO_FAM$res %>%
     mutate_if(is.numeric, function(x) round(x, 2))
@@ -660,24 +679,21 @@ write.csv(res_global_INO_FAM,"ANCOM-BC2 Global Results_INO_FAM.csv", row.names =
 
 
 
+#Trend control version 2, looking for increasing with plant trending taxa
 
-#Note: This one works but am tweaking for two reasons: to test the other matrix format that he uses in his example which we think is the correct one to use for a increasing trend..and 2: to try again while subsetting to JUST be the planted ones because of course
-#differences in inoculum conotrlling for presence of plant (but order factor might not matter??) Adding in tend and trend control node arguments to hopefully get them working
-output_INO_FAM = ancombc2(data = OBJ_W10_conn, tax_level = "Family" , fix_formula = "inoculum + group", p_adj_method = "holm", prv_cut = 0.1, lib_cut = 0,group = "inoculum", 
-              struc_zero = TRUE, neg_lb = TRUE, alpha = 0.05, global = TRUE, trend = TRUE, trend_control = list(contrast = list(matrix(c(1, 0, -1, 1),
-                                                              nrow = 2, 
-                                                              byrow = TRUE),
-                                                       matrix(c(-1, 0, 1, -1),
-                                                              nrow = 2, 
-                                                              byrow = TRUE)),
-                                       node = list(2, 2),
-                                       solver = "ECOS",
-                                       B = 10))
+#Trend control / Pattern Analysis Version:
+#Note: This one is the one that should be better, using correct matrix and subestted to only plants,
+#Further note on trend control settings and matrix. Unless otherwise specified trend control baseline follows the same rules as ancomb, tht is, alphabetical. to change the baseline must use the aboce line resetingg the levels so that the order is correctly matchinng the tutorial example\
+#differences in inoculum controlling for presence of plant (but order factor might not matter??) Adding in tend and trend control node arguments to hopefully get them working
+#This version of the trend control results will be looking for DECREASING with plant growth trending taxa.
+output_INO_FAM = ancombc2(data = OBJ_W10_conn_planted, tax_level = "Family" , fix_formula = "inoculum", p_adj_method = "holm", prv_cut = 0.1, lib_cut = 0,group = "inoculum", 
+              struc_zero = TRUE, neg_lb = TRUE, alpha = 0.05, global = TRUE, trend = TRUE, trend_control = list(contrast = list(matrix(c(-1, 0, 1, -1), nrow = 2, byrow = TRUE)), node = list(2), solver = "ECOS", B = 10))
 
+#Export trend analysis
 res_trend = output_INO_FAM$res_trend
 res_trend
     data.table(caption = "ANCOM-BC2_Trend_Results_FAM")
-write.csv(res_trend,"ANCOM-BC2_Trend_Results_FAM.csv", row.names = TRUE)
+write.csv(res_trend,"ANCOM-BC2_Trend_Results_FAM_increasingwithgrowth.csv", row.names = TRUE)
 
 res_prim_INO_FAM = output_INO_FAM$res %>%
     mutate_if(is.numeric, function(x) round(x, 2))
@@ -690,40 +706,19 @@ res_global_INO_FAM = output_INO_FAM$res_global %>%
 res_global_INO_FAM %>%
     data.table(caption = "ANCOM-BC2 Global Results_INO_FAM")
 write.csv(res_global_INO_FAM,"ANCOM-BC2 Global Results_INO_FAM.csv", row.names = TRUE)
-
-
-
-
 
 ######################################## deseq -------------------------------------------------------------------
 
 library(ggplot2)
 library("DESeq2")
 #Start here if haven't already (use raw vaules, but still subset out bad samples)
-OBJ1_exp <- subset_samples(OBJ1, Experiment == "Y")
-
 #Agglomerate at desired taxa level (if you want to, otherwise proceed to and will get individual ASV changes)
 
-OBJ1_exp_Family <- tax_glom(OBJ1_exp,taxrank = "Family")
-
-#And create subset for use later when assigning taxa (NOT for analysis, just to bind taxa to results)
-OBJ_Genus_W14 <- subset_samples(OBJ1_exp_Genus, Week == "Fourteen")
-
+OBJ_W10_conn_planted_FAM <- tax_glom(OBJ_W10_conn_planted,taxrank = "Family")
 ##Import to deseq and order factors to be compared (overall, not agglomerated)
-diagdds = phyloseq_to_deseq2(OBJ1_exp, ~ inoculum) #Re: order of factors here, this would be testing for the effect of location, controlling for connection
-#This time control for location differences, looking for connection response.
+diagdds = phyloseq_to_deseq2(OBJ_W10_conn_planted_FAM, ~ inoculum) #Re: order of factors here, this would be testing for the effect of location, controlling for connection
 
-##Import agglomerated genus
-diagdds = phyloseq_to_deseq2(OBJ1_exp_Genus, ~ Location + Connection) #Re: order of factors here, this would be testing for the effect of location, controlling for connection
-#import agglomerated family
-diagdds = phyloseq_to_deseq2(OBJ1_exp_Family , ~ Location + Connection) #Re: order of factors here, this would be testing for the effect of location, controlling for connection
-
-diagdds$Location <- relevel(diagdds$Connection, ref = "Unconnected") # sets the reference point, baseline or control to be compared against
-
-#Subset Week 14
-diagdds <- diagdds[ , diagdds$Week == "Fourteen" ]
-#check that subset was done as expected
-as.data.frame( colData(diagdds) )
+diagdds$Location <- relevel(diagdds$inoculum, ref = "a_Uninoculated") # sets the reference point, baseline or control to be compared against
 
 #Because of the way the data is nested between groups need to do some finangling to allow the model to distinguish between them correctly
 #Have added a new column that groups samples by the soil column they were in (without location data, so e.g W14UP4 for all three cathode/anode/root sampeles)
@@ -733,29 +728,25 @@ diagdds = DESeq(diagdds, test = "Wald", fitType = "parametric")
 res = results(diagdds, cooksCutoff = FALSE)
 res # print out results
 
-#Shouldnt need these anymore for agglomerated, but retain for overall
-OBJ1_exp <- subset_samples(OBJ1, Experiment == "Y")
-OBJ_W14 <- subset_samples(OBJ1_exp, Week == "Fourteen")
-
 #Bind taxonomy to results
-res = cbind(as(res, "data.frame"), as(tax_table(OBJ_Genus_W14)[rownames(res), ], "matrix"))
+res = cbind(as(res, "data.frame"), as(tax_table(OBJ_W10_conn_planted_FAM)[rownames(res), ], "matrix"))
 res
 
 #Export .csv
 write.csv(as.data.frame(res), 
-          file = "DESeq2_Genus_14.csv")
+          file = "DESeq2_FAM.csv")
 
 #For Agglomerated
 #Different Comparison Direction Sheets
-sigtabC_U = results(diagdds, contrast = c("Connection","Connected","Unconnected")) #a positive number here should represent an Increase in Connected FROM Unconnected
-sigtabU_C = results(diagdds, contrast = c("Connection","Unconnected","Connected")) #postive here should be switched, so a postive = Increase in Unconnected FROM Connected
+sigtabC_U = results(diagdds, contrast = c("inoculum","Clostridium","a_Uninoculated")) #a positive number here should represent an Increase of taxa in Clostridium FROM Uninoculated
+sigtabU_C = results(diagdds, contrast = c("inoculum","Montebello","a_Uninoculated")) #postive here should be switched, so a postive = Increase of taxa in Montebello FROM Uninoculated
 # So i think A should be the one to use...feels more logical to look at change towards connection (and makes discussion of electroactive enrichemnet easier)
 
 #Bind results sheets with OTU Taxa
-sigtab_taxC_U = cbind(as(sigtabC_U, "data.frame"), as(tax_table(OBJ_Genus_W14)[rownames(sigtabC_U), ], "matrix"))
+sigtab_taxC_U = cbind(as(sigtabC_U, "data.frame"), as(tax_table(OBJ_W10_conn_planted_FAM)[rownames(sigtabC_U), ], "matrix"))
 sigtab_taxC_U
 
-sigtab_taxU_C = cbind(as(sigtabU_C, "data.frame"), as(tax_table(OBJ_Genus_W14)[rownames(sigtabU_C), ], "matrix"))
+sigtab_taxU_C = cbind(as(sigtabU_C, "data.frame"), as(tax_table(OBJ_W10_conn_planted_FAM)[rownames(sigtabU_C), ], "matrix"))
 sigtab_taxU_C
 
 #Export .csv
