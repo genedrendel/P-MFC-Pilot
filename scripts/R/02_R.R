@@ -82,7 +82,7 @@ OBJ1 <- OBJ1 %>%
 
 
 
-# Subsetting and TSS for 2015 data --------------------------------------
+## Subsetting and TSS for 2015 data --------------------------------------
 
 
 OBJ1_exp_tss = transform_sample_counts(OBJ1, function(OTU) OTU/sum(OTU) )
@@ -124,7 +124,7 @@ OBJ_PlantOnly_FAM_tss <- tax_glom(OBJ_Plant_tss,taxrank = "Family")
 OBJ_PlantOnly_GEN_tss <- tax_glom(OBJ_Plant_tss,taxrank = "Genus")
 
 
-# ###ANCOMBC import (alt) -------------------------------------------------
+##### ###ANCOMBC import (alt) -------------------------------------------------
 ## Import for ancombc (only difference is that the phylo object is created pointing to a different mapping file alphabetised so that uninlculated treatment is used as baseline)
 
 
@@ -163,7 +163,7 @@ OBJ_W10_conn_FAM <- tax_glom(OBJ_W10_conn,taxrank = "Family")
 OBJ_W10_conn_GEN <- tax_glom(OBJ_W10_conn,taxrank = "Genus")
 
 
-# Table export for agglomerated sheets ------------------------------------
+##### Table export for agglomerated sheets ------------------------------------
 
 ##Agglomerate and then export
 #family (if not already done as per above)
@@ -180,7 +180,7 @@ TAX_tab_FAM = as(tax_table(OBJ_W10_conn_FAM), "matrix")
 TAX_tab_FAMexp = as.data.frame(TAX_tab_FAM)
 write.csv(TAX_tab_FAMexp,"Family_taxsheet.csv", row.names = TRUE)
 
-## nMDS --------------------------------------------------------------------
+###### nMDS --------------------------------------------------------------------
 
 
 #### 
@@ -234,7 +234,7 @@ NMDS_W10_NoPlant_U <- ordinate(OBJ_NoPlant_tss, "NMDS", distance = "unifrac", we
 NMDS_W10_NoPlant_U
 
 
-##### Plot Ordinations --------------------------------------------------------
+############ Plot Ordinations --------------------------------------------------------
 
 
 ### 
@@ -408,7 +408,7 @@ W10_ConnectionTest_ano_U
 
 
 
-###### PERMANOVA  --------------------------------------------------------------
+############# PERMANOVA  --------------------------------------------------------------
 
 
 ### 
@@ -608,7 +608,7 @@ p.simpson
 
 
 
-################################# ANCOMBC2 ----------------------------------------------------------------
+################################## ANCOMBC2 ----------------------------------------------------------------
 
 BiocManager::install("ANCOMBC")
 
@@ -643,7 +643,6 @@ res_global_INO_FAM %>%
 write.csv(res_global_INO_FAM,"ANCOM-BC2 Global Results_INO_FAM.csv", row.names = TRUE)
 
 #Trend control in ancom section 
-
 #reordering factors (note use Montebelo as the baseline and DO NOT change it for further runs ...ONLY change the matrix used (try increasing and decreasing trends)
 #reason for this is that the example in thr ancombc2 tutorial uses "obese" as it's baseline and we are following that example as closely as possible so as to not upset the matrix structure/baseline pattern etc
 
@@ -707,6 +706,7 @@ res_global_INO_FAM %>%
     data.table(caption = "ANCOM-BC2 Global Results_INO_FAM")
 write.csv(res_global_INO_FAM,"ANCOM-BC2 Global Results_INO_FAM.csv", row.names = TRUE)
 
+
 ######################################## deseq -------------------------------------------------------------------
 
 library(ggplot2)
@@ -756,7 +756,413 @@ write.csv(as.data.frame(sigtab_taxU_C),
           file = "DESeq2_resultsU_C.csv")
 
 
-###################################### Old paper things below here for reference -------------------------------
+
+
+######### Functional data (Fapro and picrust) ------------------------------
+
+### Faprotax
+#Just rename functional table to otu, and function names as tax table so can sub in same nfile names and commmands as for regular taxonomy
+setwd("~/Documents/University/Analysis/PMFC_15_Rerun_2023/Output/For R/Faprotax")
+
+#Quick import all to skip the below
+library(phyloseq)
+library(ape)
+library(magrittr)
+library(ggplot2)
+
+otu_table <- as.data.frame(read.csv("raw_readmap.csv", header = TRUE,row.names = "OTU_ID"))
+taxmat <- as.matrix(read.csv("tax_table.csv", row.names = 1, header = TRUE))
+treat <- as.data.frame(read.csv("mapping_file.csv", row.names = 1, header = TRUE))
+OTU = otu_table(otu_table, taxa_are_rows = TRUE)
+TAX = tax_table(taxmat)
+TREAT = sample_data(treat)
+OBJ1 = phyloseq(OTU,TAX,TREAT)
+
+#Must subset out only ocnnected samples..same as with taxa diff abund
+OBJ_W10_conn <- subset_samples(OBJ1, connection == "Connected")
+OBJ_W10_conn_planted <- subset_samples(OBJ_W10_conn, group == "Planted")
+
+#deseq
+library(ggplot2)
+library("DESeq2")
+#Start here if haven't already (use raw vaules, but still subset out bad samples)
+#Agglomerate at desired taxa level (if you want to, otherwise proceed to and will get individual ASV changes)
+
+##Import to deseq and order factors to be compared (overall, not agglomerated)
+diagdds = phyloseq_to_deseq2(OBJ_W10_conn_planted, ~ inoculum) #Re: order of factors here, this would be testing for the effect of location, controlling for connection
+
+diagdds$inoculum <- relevel(diagdds$inoculum, ref = "Uninoculated") # sets the reference point, baseline or control to be compared against
+
+#Because of the way the data is nested between groups need to do some finangling to allow the model to distinguish between them correctly
+#Have added a new column that groups samples by the soil column they were in (without location data, so e.g W14UP4 for all three cathode/anode/root sampeles)
+
+#Run model and factors
+diagdds = DESeq(diagdds, test = "Wald", fitType = "parametric")
+res = results(diagdds, cooksCutoff = FALSE)
+res # print out results
+diagdds
+#Bind taxonomy to results
+res = cbind(as(res, "data.frame"), as(tax_table(OBJ_W10_conn_planted)[rownames(res), ], "matrix"))
+res
+
+#Export .csv
+write.csv(as.data.frame(res), 
+          file = "DESeq2_FAM.csv")
+
+#For Agglomerated
+#Different Comparison Direction Sheets
+sigtabC_U = results(diagdds, contrast = c("inoculum","Clostridium","Uninoculated")) #a positive number here should represent an Increase of taxa in Clostridium FROM Uninoculated
+sigtabU_C = results(diagdds, contrast = c("inoculum","Montebello","Uninoculated")) #postive here should be switched, so a postive = Increase of taxa in Montebello FROM Uninoculated
+sigtabM_C = results(diagdds, contrast = c("inoculum","Montebello","Clostridium")) #postive here should be switched, so a postive = Increase of taxa in Montebello FROM Clostridium
+
+
+#Bind results sheets with OTU Taxa
+sigtab_taxC_U = cbind(as(sigtabC_U, "data.frame"), as(tax_table(OBJ_W10_conn_planted)[rownames(sigtabC_U), ], "matrix"))
+sigtab_taxC_U
+
+sigtab_taxU_C = cbind(as(sigtabU_C, "data.frame"), as(tax_table(OBJ_W10_conn_planted)[rownames(sigtabU_C), ], "matrix"))
+sigtab_taxU_C
+
+sigtab_taxM_C = cbind(as(sigtabM_C, "data.frame"), as(tax_table(OBJ_W10_conn_planted)[rownames(sigtabM_C), ], "matrix"))
+sigtab_taxM_C
+
+
+
+#Export .csv
+write.csv(as.data.frame(sigtab_taxC_U), 
+          file = "DESeq2_resultsC_U.csv")
+write.csv(as.data.frame(sigtab_taxU_C), 
+          file = "DESeq2_resultsU_C.csv")
+write.csv(as.data.frame(sigtab_taxM_C), 
+          file = "DESeq2_resultsM_C.csv")
+
+
+
+#ancombbc2
+
+library(ANCOMBC)
+library(microbiome)
+library(dplyr)
+library(ggplot2)
+library(data.table)
+
+factor(sample_data(OBJ_W10_conn_planted)$inoculum) 
+sample_data(OBJ_W10_conn_planted)$inoculum = factor(sample_data(OBJ_W10_conn_planted)$inoculum, levels = c("Montebello", "Uninoculated", "Clostridium"))
+
+
+#Trend control / Pattern Analysis Version 1 for decreasing abundance correlated with increased plant growth:
+#Note: This one is the one that should be better, using correct matrix and subestted to only plants,
+#Further note on trend control settings and matrix. Unless otherwise specified trend control baseline follows the same rules as ancomb, tht is, alphabetical. to change the baseline must use the aboce line resetingg the levels so that the order is correctly matchinng the tutorial example\
+#differences in inoculum controlling for presence of plant (but order factor might not matter??) Adding in tend and trend control node arguments to hopefully get them working
+#This version of the trend control results will be looking for DECREASING with plant growth trending taxa.
+output_INO_FAM = ancombc2(data = OBJ_W10_conn_planted, tax_level = "Family" , fix_formula = "inoculum", p_adj_method = "holm", prv_cut = 0.1, lib_cut = 0,group = "inoculum", 
+              struc_zero = TRUE, neg_lb = TRUE, alpha = 0.05, global = TRUE, trend = TRUE, trend_control = list(contrast = list(matrix(c(1, 0, -1, 1), nrow = 2, byrow = TRUE)), node = list(2), solver = "ECOS", B = 10))
+
+#Export trend analysis
+res_trend = output_INO_FAM$res_trend
+res_trend
+    data.table(caption = "ANCOM-BC2_Trend_Results")
+write.csv(res_trend,"ANCOM-BC2_Trend_Results_FAPRO_decreasingwithgrowth.csv", row.names = TRUE)
+
+res_prim_INO_FAM = output_INO_FAM$res %>%
+    mutate_if(is.numeric, function(x) round(x, 2))
+res_prim_INO_FAM %>%
+    data.table(caption = "ANCOM-BC2 Primary Results_INO_FAM")
+write.csv(res_prim_INO_FAM,"ANCOM-BC2 Primary Results_INO_FAM.csv", row.names = TRUE)
+
+res_global_INO_FAM = output_INO_FAM$res_global %>%
+    mutate_if(is.numeric, function(x) round(x, 2))
+res_global_INO_FAM %>%
+    data.table(caption = "ANCOM-BC2 Global Results_INO_FAM")
+write.csv(res_global_INO_FAM,"ANCOM-BC2 Global Results_INO_FAM.csv", row.names = TRUE)
+
+
+
+#Trend control version 2, looking for increasing with plant trending taxa
+
+#Trend control / Pattern Analysis Version:
+#Note: This one is the one that should be better, using correct matrix and subestted to only plants,
+#Further note on trend control settings and matrix. Unless otherwise specified trend control baseline follows the same rules as ancomb, tht is, alphabetical. to change the baseline must use the aboce line resetingg the levels so that the order is correctly matchinng the tutorial example\
+#differences in inoculum controlling for presence of plant (but order factor might not matter??) Adding in tend and trend control node arguments to hopefully get them working
+#This version of the trend control results will be looking for DECREASING with plant growth trending taxa.
+output_INO_FAM = ancombc2(data = OBJ_W10_conn_planted, tax_level = "Family" , fix_formula = "inoculum", p_adj_method = "holm", prv_cut = 0.1, lib_cut = 0,group = "inoculum", 
+              struc_zero = TRUE, neg_lb = TRUE, alpha = 0.05, global = TRUE, trend = TRUE, trend_control = list(contrast = list(matrix(c(-1, 0, 1, -1), nrow = 2, byrow = TRUE)), node = list(2), solver = "ECOS", B = 10))
+
+#Export trend analysis
+res_trend = output_INO_FAM$res_trend
+res_trend
+    data.table(caption = "ANCOM-BC2_Trend_Results")
+write.csv(res_trend,"ANCOM-BC2_Trend_Results_FAPRO_increasingwithgrowth.csv", row.names = TRUE)
+
+res_prim_INO_FAM = output_INO_FAM$res %>%
+    mutate_if(is.numeric, function(x) round(x, 2))
+res_prim_INO_FAM %>%
+    data.table(caption = "ANCOM-BC2 Primary Results_INO_FAM")
+write.csv(res_prim_INO_FAM,"ANCOM-BC2 Primary Results_INO_FAM.csv", row.names = TRUE)
+
+res_global_INO_FAM = output_INO_FAM$res_global %>%
+    mutate_if(is.numeric, function(x) round(x, 2))
+res_global_INO_FAM %>%
+    data.table(caption = "ANCOM-BC2 Global Results_INO_FAM")
+write.csv(res_global_INO_FAM,"ANCOM-BC2 Global Results_INO_FAM.csv", row.names = TRUE)
+
+
+
+
+#### nMDS
+# Overall
+# Week 10 weighted TSS 
+overall_FAPROord <- ordinate(OBJ1_exp_tss, "NMDS", distance = "bray", binary = FALSE)
+overall_FAPROord
+
+# Planted only
+# Week 10 weighted TSS (ASV)
+plant_FAPROord <- ordinate(OBJ_Plant_tss, "NMDS", distance = "bray", binary = FALSE)
+plant_FAPROord
+
+#Ordinations
+#Overall
+W10_OverallOrd_W <- plot_ordination(OBJ1_exp_tss, overall_FAPROord, color = "inoculum", shape = "group", label = NULL)
+W10_OverallOrd_W
+W10_OverallOrd_W + theme_grey() + theme(text = element_text(size = 14)) + geom_point(size = 3.5) + scale_color_manual(values = c("#177BB5","#56B4E9","#BF8300","#E09900","#008F47","#00B85C","#141414","#7A7A7A"))
+
+W10_PlantOrd_W <- plot_ordination(OBJ_Plant_tss, plant_FAPROord, color = "inoculum", shape = "group", label = NULL)
+W10_PlantOrd_W
+W10_PlantOrd_W + theme_grey() + theme(text = element_text(size = 14)) + geom_point(size = 3.5) + scale_color_manual(values = c("#177BB5","#56B4E9","#BF8300","#E09900","#008F47","#00B85C","#141414","#7A7A7A"))
+
+#PERMANOVA
+
+### 
+library(vegan)
+
+#Pull Variables
+#By plant
+PlantAll <- get_variable(OBJ1_exp_tss, "group")
+#By connection 
+ConnectionAll <- get_variable(OBJ1_exp_tss, "connection")
+#By Inoculum 
+InoculumAll <- get_variable(OBJ1_exp_tss, "inoculum")
+
+#Start setup for 2015 data, as per paper 1 script
+#Setup objects for testing significance, effect size, correlation.
+
+
+#Overall
+
+PATH_W14perm_w <- distance(OBJ1_exp_tss, "bray" , binary = FALSE)
+
+#Note if error message about "distance" method not being inherited this can occur if another package also has a distance function
+#the below version of specifying phyloseq and then distance as normal will fix this
+PATH_W14perm_w <- phyloseq::distance(OBJ1_exp_tss, "bray" , binary = FALSE)
+PATH_W14perm_w
+
+W10_ado2_W = adonis2(PATH_W14perm_w ~ PlantAll * InoculumAll * ConnectionAll, permutations = 9999)
+W10_ado2_W
+
+# Plant only
+#Pull Variables
+#By plant
+PlantAllPlant <- get_variable(OBJ_Plant_tss, "group")
+#By connection 
+ConnectionAllPlant <- get_variable(OBJ_Plant_tss, "connection")
+#By Inoculum 
+InoculumAllPlant <- get_variable(OBJ_Plant_tss, "inoculum")
+
+#Plant only PERMA
+PATH_Plantperm_w <- phyloseq::distance(OBJ_Plant_tss, "bray" , binary = FALSE)
+
+W10_ado2_W = adonis2(PATH_W14perm_w ~ PlantAll * InoculumAll * ConnectionAll, permutations = 9999)
+W10_ado2_W
+###.  by = NULL)
+###.  by = "margin")
+
+#weighted
+W10_ado2_Plant_W = adonis2(PATH_Plantperm_w  ~ ConnectionAllPlant + InoculumAllPlant, permutations = 9999)
+W10_ado2_Plant_W
+
+
+#### PICRUST
+
+
+
+# Readmap
+EC_table <- as.data.frame(read.csv("readmap_EC.csv", header = TRUE,row.names = "OTU_ID"))
+KO_table <- as.data.frame(read.csv("readmap_KO.csv", header = TRUE,row.names = "OTU_ID"))
+Path_table <- as.data.frame(read.csv("readmap_Path.csv", header = TRUE,row.names = "OTU_ID"))
+
+# "Tax" function table
+EC_mat <- as.matrix(read.csv("tax_EC.csv", row.names = 1, header = TRUE))
+KO_mat <- as.matrix(read.csv("tax_KO.csv", row.names = 1, header = TRUE))
+Path_mat <- as.matrix(read.csv("tax_Path.csv", row.names = 1, header = TRUE))
+
+# Metadata/Mapping/Treatment file
+treat <- as.data.frame(read.csv("mapping_file.csv", row.names = 1, header = TRUE))
+
+# Make Phylo object
+library(phyloseq)
+
+#EC Phylo object
+EC_OTU = otu_table(EC_table, taxa_are_rows = TRUE)
+EC_TAX = tax_table(EC_mat)
+TREAT = sample_data(treat)
+EC_PHYLO = phyloseq(EC_OTU,EC_TAX,TREAT)
+
+#KO Phylo object
+KO_OTU = otu_table(KO_table, taxa_are_rows = TRUE)
+KO_TAX = tax_table(KO_mat)
+TREAT = sample_data(treat)
+KO_PHYLO = phyloseq(KO_OTU,KO_TAX,TREAT)
+
+#Path Phylo object
+Path_OTU = otu_table(Path_table, taxa_are_rows = TRUE)
+Path_TAX = tax_table(Path_mat)
+TREAT = sample_data(treat)
+Path_PHYLO = phyloseq(Path_OTU,Path_TAX,TREAT)
+
+#BEFORE PROCEEDING need to transform, first: TSS AND then LOG+1/anderson log on the phyloseq object 
+#(this just here to test that the standardise function was doing the exact same thing)
+Path_PHYLO_tss_manual = transform_sample_counts(Path_PHYLO, function(OTU) OTU/sum(OTU) )
+Path_PHYLO_tss_manual
+#ALTERNATIVELY can use metagMisc  package to do both TSS and anderson log
+#https://github.com/vmikk/metagMisc/blob/master/man/phyloseq_standardize_otu_abundance.Rd
+#https://github.com/vmikk/metagMisc
+#https://rdrr.io/github/vmikk/metagMisc/man/phyloseq_standardize_otu_abundance.html
+#anderson log
+#Old version of the below commands
+#Path_PHYLO_tss <- phyloseq_standardize_otu_abundance(Path_PHYLO, method = "total")
+#Path_PHYLO_tss 
+#Path_PHYLO_log <- phyloseq_standardize_otu_abundance(Path_PHYLO_tss, method = "log")
+#Path_PHYLO_log
+#devtools::install_github("vmikk/metagMisc")
+
+install.packages("remotes")
+remotes::install_github("vmikk/metagMisc")
+library(metagMisc)
+
+#and cut out unwanted samples
+Path_PHYLO_log <- subset_samples(Path_PHYLO_log, Experiment == "Y")
+
+#### Subset
+
+#Combined treatments
+PATH_Unin_Conn <- subset_samples(Path_PHYLO_log, Treatment == "Uninoculated Connected")
+PATH_Mont_Conn <- subset_samples(Path_PHYLO_log, Treatment == "Montebello Connected")
+PATH_Pseudo_Conn <- subset_samples(Path_PHYLO_log, Treatment == "Pseudomonas Connected")
+
+#Wk14 Connected and Unconnected Subsets
+PATH_W14_connected <- subset_samples(PATH_W14, Connection == "Connected")
+PATH_W14_unconnected <- subset_samples(PATH_W14, Connection == "Unconnected")
+
+#Treatment
+PATH_Unin <- subset_samples(Path_PHYLO_log, Inoculum == "Uninoculated")
+PATH_Mont <- subset_samples(Path_PHYLO_log, Inoculum == "Montebello")
+PATH_Pseudo <- subset_samples(Path_PHYLO_log, Inoculum == "Pseudomonas")
+
+### NMDS + Ordination Plots
+
+library("ggplot2")
+library("RColorBrewer")
+
+#subsetted timepoints WEIGHTED
+PATH_NMDS_W14w <- ordinate(PATH_W14, "NMDS", distance = "bray", binary = FALSE)
+PATH_NMDS_W14w
+
+#Week 0
+PATH_NMDS_W0w <- ordinate(PATH_W0, "NMDS", distance = "bray", binary = FALSE)
+PATH_NMDS_W0w
+
+#Subsetted timepoints UNWEIGHTED
+PATH_NMDS_W14u <- ordinate(PATH_W14, "NMDS", distance = "bray", binary = TRUE)
+PATH_NMDS_W14u
+
+#Week 0
+PATH_NMDS_W0u <- ordinate(PATH_W0, "NMDS", distance = "bray", binary = TRUE)
+PATH_NMDS_W0u
+
+#Plot Ordination weighted
+path_W14w_ord <- plot_ordination(PATH_W14, PATH_NMDS_W14w, color = "Treatment", shape = "Location", label = NULL)
+path_W14w_ord
+path_W14w_ord + theme_grey() + theme(text = element_text(size = 14)) + geom_point(size = 3.5) + scale_color_manual(values = c("#177BB5","#56B4E9","#BF8300","#E09900","#008F47",
+                                                                                                                              "#00B85C","#141414","#7A7A7A"))
+
+#Plot Ordination unweighted
+path_W14u_ord <- plot_ordination(PATH_W14, PATH_NMDS_W14u, color = "Treatment", shape = "Location", label = NULL)
+path_W14u_ord
+path_W14u_ord + theme_grey() + theme(text = element_text(size = 14)) + geom_point(size = 3.5) + scale_color_manual(values = c("#177BB5","#56B4E9","#BF8300","#E09900","#008F47",
+                                                                                                                              "#00B85C","#141414","#7A7A7A"))
+
+#Time Zero weighted
+path_W0w_ord <- plot_ordination(PATH_W0, PATH_NMDS_W0w, color = "Treatment", shape = "Location", label = NULL)
+path_W0w_ord
+path_W0w_ord + theme_grey() + theme(text = element_text(size = 14)) + geom_point(size = 3.5) + scale_color_manual(values = c("#177BB5","#56B4E9","#BF8300","#E09900","#008F47",
+                                                                                                                             "#00B85C","#141414","#7A7A7A"))
+
+#Time Zero unweighted
+path_W0u_ord <- plot_ordination(PATH_W0, PATH_NMDS_W0u, color = "Treatment", shape = "Location", label = NULL)
+path_W0u_ord
+path_W0u_ord + theme_grey() + theme(text = element_text(size = 14)) + geom_point(size = 3.5) + scale_color_manual(values = c("#177BB5","#56B4E9","#BF8300","#E09900","#008F47",
+                                                                                                                             "#00B85C","#141414","#7A7A7A"))
+
+#Connection alone at W14
+#Unconnected
+PATH_NMDS_W14_un_w <- ordinate(PATH_W14_unconnected, "NMDS", distance = "bray", binary = FALSE)
+PATH_NMDS_W14_un_u <- ordinate(PATH_W14_unconnected, "NMDS", distance = "bray", binary = TRUE)
+
+PATH_NMDS_W14_un_w
+PATH_NMDS_W14_un_u
+
+#Connected
+PATH_NMDS_W14_con_w <- ordinate(PATH_W14_connected, "NMDS", distance = "bray", binary = FALSE)
+PATH_NMDS_W14_con_u <- ordinate(PATH_W14_connected, "NMDS", distance = "bray", binary = TRUE)
+
+PATH_NMDS_W14_con_w
+PATH_NMDS_W14_con_u
+
+############# PERMANOVA
+
+library(vegan)
+#Setup objects for testing significance, effect size, correlation.
+#First pull the variables you want to test into objects:
+#By location at end and start
+Location <- get_variable(PATH_W14, "Location")
+Location0 <- get_variable(PATH_W0, "Location")
+
+#By connection at end
+Connection <- get_variable(PATH_W14, "Connection")
+Connection0 <- get_variable(PATH_W0, "Connection")
+
+#By Inoculum at end
+Inoculum <- get_variable(PATH_W14, "Inoculum")
+Inoculum0 <- get_variable(PATH_W0, "Inoculum")
+
+#W14
+PATH_W14perm_w <- distance(PATH_W14, "bray" , binary = FALSE)
+PATH_W14perm_u <- distance(PATH_W14, "bray" , binary = TRUE)
+
+PATH_W14_ado_w = adonis(PATH_W14perm_w ~ Location * Connection * Inoculum, permutations = 9999)
+PATH_W14_ado_w
+
+PATH_W14_ado_u = adonis(PATH_W14perm_u ~ Location * Connection * Inoculum, permutations = 9999)
+PATH_W14_ado_u
+
+#W0
+PATH_W0perm_w <- distance(PATH_W0, "bray" , binary = FALSE)
+PATH_W0perm_u <- distance(PATH_W0, "bray" , binary = TRUE)
+
+PATH_W0_ado_w = adonis(PATH_W0perm_w ~ Location0 * Connection0 * Inoculum0, permutations = 9999)
+PATH_W0_ado_w
+
+PATH_W0_ado_u = adonis(PATH_W0perm_u ~ Location0 * Connection0 * Inoculum0, permutations = 9999)
+PATH_W0_ado_u
+
+# Import
+
+#deseq
+
+#ancombbc2
+
+
+# Old paper things below here for reference -------------------------------
 
 
 ### Old paper things beloow here onwards
