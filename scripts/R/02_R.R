@@ -48,12 +48,6 @@ library(ggplot2)
 otu_table <- as.data.frame(read.csv("raw_readmap.csv", header = TRUE,row.names = "OTU_ID"))
 taxmat <- as.matrix(read.csv("tax_table.csv", row.names = 1, header = TRUE))
 treat <- as.data.frame(read.csv("mapping_file.csv", row.names = 1, header = TRUE))
-
-#order factors, for reordering in ancom
-
-taxmat <- as.data.frame(read.csv("tax_table.csv", row.names = 1, header = TRUE))
-taxmat$inoculum
-
 TREE <- read.tree("rooted_tree.nwk")
 OTU = otu_table(otu_table, taxa_are_rows = TRUE)
 TAX = tax_table(taxmat)
@@ -89,11 +83,26 @@ OBJ1_exp_tss = transform_sample_counts(OBJ1, function(OTU) OTU/sum(OTU) )
 
 OBJ_Plant <- subset_samples(OBJ1, group == "Planted")
 OBJ_NoPlant <- subset_samples(OBJ1, group == "Unplanted")
+#NOTE for below line, do NOT confuse this with subsetting out only planted and connected samples
+#This subset is actually for: seubsetting out both sets of uninoculated samples, i.e is for comparing connected with unconnected
 OBJ_PlantConnectionOnly <- subset_samples(OBJ1, plant_connection == "yes")
 
 OBJ_Plant_tss <- subset_samples(OBJ1_exp_tss, group == "Planted")
 OBJ_NoPlant_tss <- subset_samples(OBJ1_exp_tss, group == "Unplanted")
 OBJ_PlantConnectionOnly_tss <- subset_samples(OBJ1_exp_tss, plant_connection == "yes")
+
+# subset out only ocnnect3ed treatments (with plants)
+#Must subset out only ocnnected samples..
+OBJ_W10_conn <- subset_samples(OBJ1, connection == "Connected")
+OBJ_W10_conn_planted <- subset_samples(OBJ_W10_conn, group == "Planted")
+#TSS versions for planted only, and connected only:
+OBJ_W10_conn_tss <- subset_samples(OBJ1_exp_tss, connection == "Connected")
+OBJ_W10_conn_planted_tss <- subset_samples(OBJ_W10_conn_tss, group == "Planted")
+
+#not neccessary for ancom but could be useful to have to look at the same subest using other tools to compare iwth ancom later
+OBJ_W10_conn_FAM <- tax_glom(OBJ_W10_conn_planted,taxrank = "Family")
+OBJ_W10_conn_FAM_tss <- tax_glom(OBJ_W10_conn_planted_tss,taxrank = "Family")
+
 
 #Main Functional object  outputs from this and initial import:
 OBJ1 #raw import, overall data
@@ -153,14 +162,6 @@ OBJ1 <- OBJ1 %>%
     Class   != "Chloroplast"
   )
 
-#For ancombc looks like need to subset out only ocnnect3ed treatments
-#Must subset out only ocnnected samples..
-OBJ_W10_conn <- subset_samples(OBJ1, connection == "Connected")
-OBJ_W10_conn_planted <- subset_samples(OBJ_W10_conn, group == "Planted")
-
-#not neccessary for ancom but could be useful to have to look at the same subest using other tools to compare iwth ancom later
-OBJ_W10_conn_FAM <- tax_glom(OBJ_W10_conn,taxrank = "Family")
-OBJ_W10_conn_GEN <- tax_glom(OBJ_W10_conn,taxrank = "Genus")
 
 
 ##### Table export for agglomerated sheets ------------------------------------
@@ -221,8 +222,9 @@ NMDS_W10_Plant_U
 NMDS_W10_Plant_U_FAM <- ordinate(OBJ_PlantOnly_FAM_tss, "NMDS", distance = "unifrac", weighted = FALSE, parallel = TRUE)
 NMDS_W10_Plant_U_FAM
 
-
-
+#Planted only + connected only (i..e subseeting to remove unninoculated&unconnected reps)
+NMDS_plantconnonly_FAM <- ordinate(OBJ_W10_conn_FAM_tss, "NMDS", distance = "unifrac", weighted = TRUE, parallel = TRUE)
+NMDS_plantconnonly_FAM
 
 # Unplanted Only
 # Week 10 weighted TSS (ASV)
@@ -233,6 +235,17 @@ NMDS_W10_NoPlant_W
 NMDS_W10_NoPlant_U <- ordinate(OBJ_NoPlant_tss, "NMDS", distance = "unifrac", weighted = FALSE, parallel = TRUE)
 NMDS_W10_NoPlant_U
 
+
+#Note fix the subset for this tomorrow**********
+#Need to make another TSS subset of only connected and only planted....alsocan now remove the old ancomb import
+#Unplanted and connected only
+#Weighted
+NMDS_W10_NoPlant_W <- ordinate(OBJ_NoPlant_tss, "NMDS", distance = "unifrac", weighted = TRUE, parallel = TRUE)
+NMDS_W10_NoPlant_W
+
+#Unweighted
+NMDS_W10_NoPlant_U <- ordinate(OBJ_NoPlant_tss, "NMDS", distance = "unifrac", weighted = FALSE, parallel = TRUE)
+NMDS_W10_NoPlant_U
 
 ############ Plot Ordinations --------------------------------------------------------
 
@@ -278,6 +291,11 @@ W10_PlantOrd_W_fam <- plot_ordination(OBJ_PlantOnly_FAM_tss, NMDS_W10_Plant_W_FA
 W10_PlantOrd_W_fam
 W10_PlantOrd_W_fam + theme_grey() + theme(text = element_text(size = 14)) + geom_point(size = 3.5) + scale_color_manual(values = c("#177BB5","#56B4E9","#BF8300","#E09900","#008F47","#00B85C","#141414","#7A7A7A"))
 
+#Plant connected subset only
+W10_PlantOrd_W_fam <- plot_ordination(OBJ_W10_conn_FAM_tss, NMDS_plantconnonly_FAM, color = "inoculum", shape = "connection", label = NULL)
+W10_PlantOrd_W_fam <- plot_ordination(OBJ_W10_conn_FAM_tss, NMDS_plantconnonly_FAM, color = "treatment", shape = "connection", label = NULL)
+W10_PlantOrd_W_fam
+W10_PlantOrd_W_fam + theme_grey() + theme(text = element_text(size = 14)) + geom_point(size = 3.5) + scale_color_manual(values = c("#177BB5","#56B4E9","#BF8300","#E09900","#008F47","#00B85C","#141414","#7A7A7A"))
 
 
 #Unweighted
