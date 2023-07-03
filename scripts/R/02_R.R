@@ -702,7 +702,7 @@ write.csv(res_global_INO_FAM,"ANCOM-BC2 Global Results_INO_FAM.csv", row.names =
 #Note: This one is the one that should be better, using correct matrix and subestted to only plants,
 #Further note on trend control settings and matrix. Unless otherwise specified trend control baseline follows the same rules as ancomb, tht is, alphabetical. to change the baseline must use the aboce line resetingg the levels so that the order is correctly matchinng the tutorial example\
 #differences in inoculum controlling for presence of plant (but order factor might not matter??) Adding in tend and trend control node arguments to hopefully get them working
-#This version of the trend control results will be looking for DECREASING with plant growth trending taxa.
+#This version of the trend control results will be looking for INCREASING with plant growth trending taxa.
 output_INO_FAM = ancombc2(data = OBJ_W10_conn_planted, tax_level = "Family" , fix_formula = "inoculum", p_adj_method = "holm", prv_cut = 0.1, lib_cut = 0,group = "inoculum", 
               struc_zero = TRUE, neg_lb = TRUE, alpha = 0.05, global = TRUE, trend = TRUE, trend_control = list(contrast = list(matrix(c(-1, 0, 1, -1), nrow = 2, byrow = TRUE)), node = list(2), solver = "ECOS", B = 100))
 
