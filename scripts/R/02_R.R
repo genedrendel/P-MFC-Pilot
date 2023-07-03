@@ -1180,6 +1180,15 @@ PATH_W0_ado_u
 #ancombbc2
 
 
+
+
+# FuncDiv testing ---------------------------------------------------------
+
+install.packages('FuncDiv')
+
+#Files needed: KEGG
+
+
 # Old paper things below here for reference -------------------------------
 
 
