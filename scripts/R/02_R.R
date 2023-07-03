@@ -674,7 +674,7 @@ sample_data(OBJ_W10_conn_planted)$inoculum = factor(sample_data(OBJ_W10_conn_pla
 #differences in inoculum controlling for presence of plant (but order factor might not matter??) Adding in tend and trend control node arguments to hopefully get them working
 #This version of the trend control results will be looking for DECREASING with plant growth trending taxa.
 output_INO_FAM = ancombc2(data = OBJ_W10_conn_planted, tax_level = "Family" , fix_formula = "inoculum", p_adj_method = "holm", prv_cut = 0.1, lib_cut = 0,group = "inoculum", 
-              struc_zero = TRUE, neg_lb = TRUE, alpha = 0.05, global = TRUE, trend = TRUE, trend_control = list(contrast = list(matrix(c(1, 0, -1, 1), nrow = 2, byrow = TRUE)), node = list(2), solver = "ECOS", B = 10))
+              struc_zero = TRUE, neg_lb = TRUE, alpha = 0.05, global = TRUE, trend = TRUE, trend_control = list(contrast = list(matrix(c(1, 0, -1, 1), nrow = 2, byrow = TRUE)), node = list(2), solver = "ECOS", B = 100))
 
 #Export trend analysis
 res_trend = output_INO_FAM$res_trend
@@ -704,7 +704,7 @@ write.csv(res_global_INO_FAM,"ANCOM-BC2 Global Results_INO_FAM.csv", row.names =
 #differences in inoculum controlling for presence of plant (but order factor might not matter??) Adding in tend and trend control node arguments to hopefully get them working
 #This version of the trend control results will be looking for DECREASING with plant growth trending taxa.
 output_INO_FAM = ancombc2(data = OBJ_W10_conn_planted, tax_level = "Family" , fix_formula = "inoculum", p_adj_method = "holm", prv_cut = 0.1, lib_cut = 0,group = "inoculum", 
-              struc_zero = TRUE, neg_lb = TRUE, alpha = 0.05, global = TRUE, trend = TRUE, trend_control = list(contrast = list(matrix(c(-1, 0, 1, -1), nrow = 2, byrow = TRUE)), node = list(2), solver = "ECOS", B = 10))
+              struc_zero = TRUE, neg_lb = TRUE, alpha = 0.05, global = TRUE, trend = TRUE, trend_control = list(contrast = list(matrix(c(-1, 0, 1, -1), nrow = 2, byrow = TRUE)), node = list(2), solver = "ECOS", B = 100))
 
 #Export trend analysis
 res_trend = output_INO_FAM$res_trend
