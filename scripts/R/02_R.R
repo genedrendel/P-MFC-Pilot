@@ -39,6 +39,9 @@ BiocManager::valid()
 #Set your working directory, location for data tables, tree, etc
 setwd("~/Documents/University/Analysis/PMFC_15_Rerun_2023/Output/For R")
 
+#picrust working directory (for quick import for picrust without needing to make its own section for now)
+setwd("~/Documents/University/Analysis/PMFC_15_Rerun_2023/Output/For R/picrust import sheets")
+
 #Quick import all to skip the below
 library(phyloseq)
 library(ape)
@@ -99,7 +102,7 @@ OBJ_W10_conn_planted <- subset_samples(OBJ_W10_conn, group == "Planted")
 OBJ_W10_conn_tss <- subset_samples(OBJ1_exp_tss, connection == "Connected")
 OBJ_W10_conn_planted_tss <- subset_samples(OBJ_W10_conn_tss, group == "Planted")
 
-#not neccessary for ancom but could be useful to have to look at the same subest using other tools to compare iwth ancom later
+#not neccessary for ancom? but also could be useful to have to look at the same subest using other tools to compare iwth ancom later
 OBJ_W10_conn_FAM <- tax_glom(OBJ_W10_conn_planted,taxrank = "Family")
 OBJ_W10_conn_FAM_tss <- tax_glom(OBJ_W10_conn_planted_tss,taxrank = "Family")
 
@@ -136,8 +139,13 @@ OBJ_PlantOnly_GEN_tss <- tax_glom(OBJ_Plant_tss,taxrank = "Genus")
 ##### ###ANCOMBC import (alt) -------------------------------------------------
 ## Import for ancombc (only difference is that the phylo object is created pointing to a different mapping file alphabetised so that uninlculated treatment is used as baseline)
 
+#Note use of different tax sheet with levels above family concatenated within the family column
 
 setwd("~/Documents/University/Analysis/PMFC_15_Rerun_2023/Output/For R")
+
+
+#picrust working directory (for quick import without needing to make its own section for now)
+setwd("~/Documents/University/Analysis/PMFC_15_Rerun_2023/Output/For R/picrust import sheets")
 
 #Quick import all to skip the below
 library(phyloseq)
@@ -146,7 +154,7 @@ library(magrittr)
 library(ggplot2)
 
 otu_table <- as.data.frame(read.csv("raw_readmap.csv", header = TRUE,row.names = "OTU_ID"))
-taxmat <- as.matrix(read.csv("tax_table.csv", row.names = 1, header = TRUE))
+taxmat <- as.matrix(read.csv("tax_table_CONC.csv", row.names = 1, header = TRUE))
 treat <- as.data.frame(read.csv("mapping_file_ancom-ordering.csv", row.names = 1, header = TRUE))
 TREE <- read.tree("rooted_tree.nwk")
 OTU = otu_table(otu_table, taxa_are_rows = TRUE)
@@ -180,6 +188,154 @@ write.csv(OTU_tab_FAMexp,"Family_otusheet.csv", row.names = TRUE)
 TAX_tab_FAM = as(tax_table(OBJ_W10_conn_FAM), "matrix")
 TAX_tab_FAMexp = as.data.frame(TAX_tab_FAM)
 write.csv(TAX_tab_FAMexp,"Family_taxsheet.csv", row.names = TRUE)
+
+########################## alpha diversity ---------------------------------------------------------
+
+
+# alpha diversity measures
+
+library(ggplot2)
+library(microbiome)
+library(knitr)
+
+##package microbiome needs to be loaded from bioconductor:
+##https://www.bioconductor.org/packages/release/bioc/html/microbiome.html
+
+tab <- microbiome::alpha(OBJ1, index = "all")
+kable(head(tab))
+
+plot_richness(OBJ1, x = "group", measures = c("Observed", "Shannon")) +
+  geom_boxplot() +
+  theme_classic() +
+  theme(strip.background = element_blank(), axis.text.x.bottom = element_text(angle = -90))
+
+plot_richness(OBJ1, x = "inoculum", measures = c("Observed", "Shannon")) +
+  geom_boxplot() +
+  theme_classic() +
+  theme(strip.background = element_blank(), axis.text.x.bottom = element_text(angle = -90))
+
+plot_richness(OBJ1, x = "group", measures = c("Observed", "Shannon")) +
+  geom_boxplot() +
+  theme_classic() +
+  theme(strip.background = element_blank(), axis.text.x.bottom = element_text(angle = -90))
+
+
+estimate_richness(OBJ1, split = TRUE, measures = NULL)
+estimate_richness(OBJ1, split = FALSE, measures = NULL)
+
+#Overall 
+a <- plot_richness(OBJ1, x = "group")# measures=c("Simpson","Chao1", "Shannon"))#+ theme_bw()
+a
+
+b <- plot_richness(OBJ1, x = "inoculum")# measures=c("Simpson","Chao1", "Shannon"))#+ theme_bw()
+b
+
+c <- plot_richness(OBJ1, x = "treatment")# measures=c("Simpson","Chao1", "Shannon"))#+ theme_bw()
+c
+
+#Plant Only
+d <- plot_richness(OBJ_Plant, x = "inoculum")# measures=c("Simpson","Chao1", "Shannon"))#+ theme_bw()
+d
+
+
+
+# Individual plots
+#scale_color_manual(values = c("#177BB5","#56B4E9","#BF8300","#E09900","#008F47","#00B85C","#141414","#7A7A7A")
+
+#Overall
+
+#Overall Plant by Shannon
+p.shannon <- boxplot_alpha(OBJ1, 
+                           index = "shannon",
+                           x_var = "group",
+                           fill.colors = c(Planted = "#177BB5",Unplanted =  "#BF8300"))
+
+p.shannon <- p.shannon + theme_minimal() + 
+  labs(x = "Plant", y = "Shannon diversity") +
+  theme(axis.text = element_text(size = 12),
+        axis.title = element_text(size = 16),
+        legend.text = element_text(size = 12),
+        legend.title = element_text(size = 16))
+p.shannon
+
+#Overall Plant by Simpson
+p.simpson <- boxplot_alpha(OBJ1, 
+                           index = "gini_simpson",
+                           x_var = "group",
+                           fill.colors = c(Planted = "#177BB5",Unplanted =  "#BF8300"))
+
+p.simpson <- p.simpson + theme_minimal() + 
+  labs(x = "Plant", y = "Gini Simpson") +
+  theme(axis.text = element_text(size = 12),
+        axis.title = element_text(size = 16),
+        legend.text = element_text(size = 12),
+        legend.title = element_text(size = 16))
+p.simpson
+
+
+
+
+
+#Overall Inoculum by Shannon
+p.shannon <- boxplot_alpha(OBJ1, 
+                           index = "Shannon",
+                           x_var = "inoculum",
+                           fill.colors = c(Clostridium = "#177BB5",Montebello =  "#BF8300",Unconnected_Uninoculated = "#008F47", Uninoculated = "#7A7A7A"))
+
+p.shannon <- p.shannon + theme_minimal() + 
+  labs(x = "Inoculum", y = "Shannon diversity") +
+  theme(axis.text = element_text(size = 12),
+        axis.title = element_text(size = 16),
+        legend.text = element_text(size = 12),
+        legend.title = element_text(size = 16))
+p.shannon
+
+#Overall Inoculum by Simpson
+p.simpson <- boxplot_alpha(OBJ1, 
+                           index = "Gini_Simpson",
+                           x_var = "inoculum",
+                           fill.colors = c(Clostridium = "#177BB5",Montebello =  "#BF8300",Unconnected_Uninoculated = "#008F47", Uninoculated = "#7A7A7A"))
+
+p.simpson <- p.simpson + theme_minimal() + 
+  labs(x = "Plant", y = "Gini Simpson") +
+  theme(axis.text = element_text(size = 12),
+        axis.title = element_text(size = 16),
+        legend.text = element_text(size = 12),
+        legend.title = element_text(size = 16))
+p.simpson
+
+
+
+#Plant only
+#Plant only Inoculum, by Shannon
+p.shannon <- boxplot_alpha(OBJ_Plant, 
+                           index = "Shannon",
+                           x_var = "inoculum",
+                           fill.colors = c(Clostridium = "#177BB5",Montebello =  "#BF8300",Unconnected_Uninoculated = "#008F47", Uninoculated = "#7A7A7A"))
+
+p.shannon <- p.shannon + theme_minimal() + 
+  labs(x = "Inoculum", y = "Shannon diversity") +
+  theme(axis.text = element_text(size = 12),
+        axis.title = element_text(size = 16),
+        legend.text = element_text(size = 12),
+        legend.title = element_text(size = 16))
+p.shannon
+
+#Plant only Inoculum, by Shannon
+#Overall Inoculum by Simpson
+p.simpson <- boxplot_alpha(OBJ_Plant, 
+                           index = "Gini_Simpson",
+                           x_var = "inoculum",
+                           fill.colors = c(Clostridium = "#177BB5",Montebello =  "#BF8300",Unconnected_Uninoculated = "#008F47", Uninoculated = "#7A7A7A"))
+
+p.simpson <- p.simpson + theme_minimal() + 
+  labs(x = "Plant", y = "Gini Simpson") +
+  theme(axis.text = element_text(size = 12),
+        axis.title = element_text(size = 16),
+        legend.text = element_text(size = 12),
+        legend.title = element_text(size = 16))
+p.simpson
+
 
 ###### nMDS --------------------------------------------------------------------
 
@@ -502,126 +658,8 @@ W10_ado2_Plant_U
 W10_ado2_Plant_FAM_U = adonis2(OBJ1_Wperm_Plant_FAM_U ~ ConnectionAllPlant * InoculumAllPlant, permutations = 9999)
 W10_ado2_Plant_FAM_U
 
-# alpha diversity measures
-
-library(ggplot2)
-library(microbiome)
-
-##package microbiome needs to be loaded from bioconductor:
-##https://www.bioconductor.org/packages/release/bioc/html/microbiome.html
-
-#Overall 
-a <- plot_richness(OBJ1, x = "group")# measures=c("Simpson","Chao1", "Shannon"))#+ theme_bw()
-a
-
-b <- plot_richness(OBJ1, x = "inoculum")# measures=c("Simpson","Chao1", "Shannon"))#+ theme_bw()
-b
-
-c <- plot_richness(OBJ1, x = "treatment")# measures=c("Simpson","Chao1", "Shannon"))#+ theme_bw()
-c
-
-#Plant Only
-d <- plot_richness(OBJ_Plant, x = "inoculum")# measures=c("Simpson","Chao1", "Shannon"))#+ theme_bw()
-d
 
 
-
-# Individual plots
-#scale_color_manual(values = c("#177BB5","#56B4E9","#BF8300","#E09900","#008F47","#00B85C","#141414","#7A7A7A")
-
-#Overall
-
-#Overall Plant by Shannon
-p.shannon <- boxplot_alpha(OBJ1, 
-                           index = "shannon",
-                           x_var = "group",
-                           fill.colors = c(Planted = "#177BB5",Unplanted =  "#BF8300"))
-
-p.shannon <- p.shannon + theme_minimal() + 
-  labs(x = "Plant", y = "Shannon diversity") +
-  theme(axis.text = element_text(size = 12),
-        axis.title = element_text(size = 16),
-        legend.text = element_text(size = 12),
-        legend.title = element_text(size = 16))
-p.shannon
-
-#Overall Plant by Simpson
-p.simpson <- boxplot_alpha(OBJ1, 
-                           index = "gini_simpson",
-                           x_var = "group",
-                           fill.colors = c(Planted = "#177BB5",Unplanted =  "#BF8300"))
-
-p.simpson <- p.simpson + theme_minimal() + 
-  labs(x = "Plant", y = "Gini Simpson") +
-  theme(axis.text = element_text(size = 12),
-        axis.title = element_text(size = 16),
-        legend.text = element_text(size = 12),
-        legend.title = element_text(size = 16))
-p.simpson
-
-
-
-
-
-#Overall Inoculum by Shannon
-p.shannon <- boxplot_alpha(OBJ1, 
-                           index = "Shannon",
-                           x_var = "inoculum",
-                           fill.colors = c(Clostridium = "#177BB5",Montebello =  "#BF8300",Unconnected_Uninoculated = "#008F47", Uninoculated = "#7A7A7A"))
-
-p.shannon <- p.shannon + theme_minimal() + 
-  labs(x = "Inoculum", y = "Shannon diversity") +
-  theme(axis.text = element_text(size = 12),
-        axis.title = element_text(size = 16),
-        legend.text = element_text(size = 12),
-        legend.title = element_text(size = 16))
-p.shannon
-
-#Overall Inoculum by Simpson
-p.simpson <- boxplot_alpha(OBJ1, 
-                           index = "Gini_Simpson",
-                           x_var = "inoculum",
-                           fill.colors = c(Clostridium = "#177BB5",Montebello =  "#BF8300",Unconnected_Uninoculated = "#008F47", Uninoculated = "#7A7A7A"))
-
-p.simpson <- p.simpson + theme_minimal() + 
-  labs(x = "Plant", y = "Gini Simpson") +
-  theme(axis.text = element_text(size = 12),
-        axis.title = element_text(size = 16),
-        legend.text = element_text(size = 12),
-        legend.title = element_text(size = 16))
-p.simpson
-
-
-
-#Plant only
-#Plant only Inoculum, by Shannon
-p.shannon <- boxplot_alpha(OBJ_Plant, 
-                           index = "Shannon",
-                           x_var = "inoculum",
-                           fill.colors = c(Clostridium = "#177BB5",Montebello =  "#BF8300",Unconnected_Uninoculated = "#008F47", Uninoculated = "#7A7A7A"))
-
-p.shannon <- p.shannon + theme_minimal() + 
-  labs(x = "Inoculum", y = "Shannon diversity") +
-  theme(axis.text = element_text(size = 12),
-        axis.title = element_text(size = 16),
-        legend.text = element_text(size = 12),
-        legend.title = element_text(size = 16))
-p.shannon
-
-#Plant only Inoculum, by Shannon
-#Overall Inoculum by Simpson
-p.simpson <- boxplot_alpha(OBJ_Plant, 
-                           index = "Gini_Simpson",
-                           x_var = "inoculum",
-                           fill.colors = c(Clostridium = "#177BB5",Montebello =  "#BF8300",Unconnected_Uninoculated = "#008F47", Uninoculated = "#7A7A7A"))
-
-p.simpson <- p.simpson + theme_minimal() + 
-  labs(x = "Plant", y = "Gini Simpson") +
-  theme(axis.text = element_text(size = 12),
-        axis.title = element_text(size = 16),
-        legend.text = element_text(size = 12),
-        legend.title = element_text(size = 16))
-p.simpson
 
 
 
@@ -645,7 +683,7 @@ library(data.table)
 #differences in inoculation treatment controlling for differences in inoculum? (actually in retrospect dont think ordering actually matters in any way...so use this again for baseline non pattern analysis comaprisons from now on)
 
 
-output_INO_FAM = ancombc2(data = OBJ_W10_conn_planted, tax_level = "Family" , fix_formula = "group + inoculum", p_adj_method = "holm", prv_cut = 0.1, lib_cut = 0,group = "inoculum", 
+output_INO_FAM = ancombc2(data = OBJ_W10_conn_planted, tax_level = "Family" , fix_formula = "inoculum", p_adj_method = "holm", prv_cut = 0.1, lib_cut = 0,group = "inoculum", 
               struc_zero = TRUE, neg_lb = TRUE, alpha = 0.05, global = TRUE)
 
 res_prim_INO_FAM = output_INO_FAM$res %>%
@@ -659,6 +697,12 @@ res_global_INO_FAM = output_INO_FAM$res_global %>%
 res_global_INO_FAM %>%
     data.table(caption = "ANCOM-BC2 Global Results_INO_FAM")
 write.csv(res_global_INO_FAM,"ANCOM-BC2 Global Results_INO_FAM.csv", row.names = TRUE)
+
+
+
+########### ANCOM pattern analysis --------------------------------------------------
+
+#Note re:import, although the below factor reset does negate the need to futz around wiht renaming columns, because i tested it with the already renamed set it will still need to be iimported using the alternative import unless I can be bothered rewriting again to ensure all is using the oeriginal sheets for phyloseq import
 
 #Trend control in ancom section 
 #reordering factors (note use Montebelo as the baseline and DO NOT change it for further runs ...ONLY change the matrix used (try increasing and decreasing trends)
@@ -674,7 +718,7 @@ sample_data(OBJ_W10_conn_planted)$inoculum = factor(sample_data(OBJ_W10_conn_pla
 #differences in inoculum controlling for presence of plant (but order factor might not matter??) Adding in tend and trend control node arguments to hopefully get them working
 #This version of the trend control results will be looking for DECREASING with plant growth trending taxa.
 output_INO_FAM = ancombc2(data = OBJ_W10_conn_planted, tax_level = "Family" , fix_formula = "inoculum", p_adj_method = "holm", prv_cut = 0.1, lib_cut = 0,group = "inoculum", 
-              struc_zero = TRUE, neg_lb = TRUE, alpha = 0.05, global = TRUE, trend = TRUE, trend_control = list(contrast = list(matrix(c(1, 0, -1, 1), nrow = 2, byrow = TRUE)), node = list(2), solver = "ECOS", B = 100))
+              struc_zero = TRUE, neg_lb = TRUE, alpha = 0.05, global = TRUE, trend = TRUE, trend_control = list(contrast = list(matrix(c(1, 0, -1, 1), nrow = 2, byrow = TRUE)), node = list(2), solver = "ECOS", B = 10))
 
 #Export trend analysis
 res_trend = output_INO_FAM$res_trend
@@ -704,7 +748,7 @@ write.csv(res_global_INO_FAM,"ANCOM-BC2 Global Results_INO_FAM.csv", row.names =
 #differences in inoculum controlling for presence of plant (but order factor might not matter??) Adding in tend and trend control node arguments to hopefully get them working
 #This version of the trend control results will be looking for INCREASING with plant growth trending taxa.
 output_INO_FAM = ancombc2(data = OBJ_W10_conn_planted, tax_level = "Family" , fix_formula = "inoculum", p_adj_method = "holm", prv_cut = 0.1, lib_cut = 0,group = "inoculum", 
-              struc_zero = TRUE, neg_lb = TRUE, alpha = 0.05, global = TRUE, trend = TRUE, trend_control = list(contrast = list(matrix(c(-1, 0, 1, -1), nrow = 2, byrow = TRUE)), node = list(2), solver = "ECOS", B = 100))
+              struc_zero = TRUE, neg_lb = TRUE, alpha = 0.05, global = TRUE, trend = TRUE, trend_control = list(contrast = list(matrix(c(-1, 0, 1, -1), nrow = 2, byrow = TRUE)), node = list(2), solver = "ECOS", B = 10))
 
 #Export trend analysis
 res_trend = output_INO_FAM$res_trend
